@@ -29,7 +29,7 @@ export default async function handler(req, res) {
 
     // USAR LA LEGACY KEY (la que empieza con eyJhbG...), no la sbp_
     const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdyd2lxcXNjdGtxeGNqeGJpcGpqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDI2MjY4OCwiZXhwIjoyMTA1ODM4Njg4fQ.F_t_CbfdSrvOHBpHswJcO0D8I2jQQQk8mACJHFWGPwY'; // Pega tu key completa aquí
 
     console.log('URL:', SUPABASE_URL);
     console.log('KEY starts with:', SERVICE_KEY?.substring(0, 10) + '...');
